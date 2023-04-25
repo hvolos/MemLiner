@@ -38,11 +38,20 @@ then
 	echo " Warning : home_dir is null."
 fi
 
+function convert_size_to_bytes () {
+	local size=$1
+	size=$(echo ${size} | sed s/G/*1024*1024*1024/)
+	size=$(echo ${size} | sed s/M/*1024*1024/)
+	size=$(echo ${size} | sed s/K/*1024/)
+	echo ${size} | bc
+}
+
 function fallocate_using_dd () {
-	local size_kb=$(echo $1 | sed s/G/*1024*1024/ | bc)
+	local size_bytes=$(convert_size_to_bytes $1)
+	local size_kilobytes=$(echo "${size_bytes}/1024" | bc)
 	local swapfile=$2
-	
-	sudo dd if=/dev/zero of=${swapfile} bs=1024 count=${size_kb}
+
+	sudo dd if=/dev/zero of=${swapfile} bs=1024 count=${size_kilobytes}
 }
 
 ## self defined function
@@ -81,8 +90,10 @@ function create_swap_file () {
 	if [ -e ${swap_file} ]
 	then
 		echo "Please confirm the size of swapfile match the expected ${SWAP_PARTITION_SIZE}"
-		cur_size=$(du -sh ${swap_file} | awk '{print $1;}' )
-		if [ "${cur_size}" != "${SWAP_PARTITION_SIZE}" ]
+		local cur_size=$(du -sh ${swap_file} | awk '{print $1;}' )
+		local cur_size_bytes=$(du -sb ${swap_file} | awk '{print $1;}' )
+		local swap_partition_size_bytes=$(convert_size_to_bytes ${SWAP_PARTITION_SIZE})
+		if [ "${cur_size_bytes}" != "${swap_partition_size_bytes}" ]
 		then
 			echo "Current ${swap_file} : ${cur_size} NOT equal to expected ${SWAP_PARTITION_SIZE}"
 			echo "Delete it"
